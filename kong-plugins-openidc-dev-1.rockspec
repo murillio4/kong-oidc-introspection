@@ -1,10 +1,10 @@
 package = "kong-plugins-openidc"
 version = "dev-1"
 source = {
-   url = "git+ssh://git@github.com:murillio4/kong-oidc-introspection.git"
+   url = "https://github.com/murillio4/kong-openidc.git"
 }
 description = {
-   homepage = "https://github.com/murillio4/kong-oidc-introspection",
+   homepage = "https://github.com/murillio4/kong-openidc",
    license = "Apache 2.0"
 }
 dependencies = {
