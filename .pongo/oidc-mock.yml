@@ -1,0 +1,22 @@
+version: '3.5'
+
+services:
+  oidc-mock:
+    image: oidc-mock
+    build:
+      context: ${PWD}/.pongo/oidc-mock
+    ports:
+      - "8080:8080"
+    healthcheck:
+      interval: 10s
+      retries: 10
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:8080/healthcheck
+      timeout: 3s
+    restart: on-failure
+    stop_signal: SIGKILL
+    networks:
+      - ${NETWORK_NAME}

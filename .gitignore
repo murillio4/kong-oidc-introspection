@@ -39,3 +39,11 @@ luac.out
 *.x86_64
 *.hex
 
+# servroot typically is the Kong working directory for tests
+servroot
+# exclude generated packed rocks
+*.rock
+/luarocks
+/lua
+/lua_modules
+/.luarocks

@@ -1,0 +1,17 @@
+{
+  "name": "oidc-mock",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "oauth2-mock-server": "^3.1.0"
+  },
+  "type": "module"
+}
