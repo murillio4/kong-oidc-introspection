@@ -1,6 +1,8 @@
 local utils = require "kong.tools.utils"
 local helpers = require "spec.helpers"
--- local request = require "http.request"
+local http = require "resty.http"
+
+local oidc_mock_endpoint = "http://oidc-mock:8080"
 
 -- local function get_token(claims, ttl)
 --   local req = request.new_from_uri("http://oidc-mock:8080")
@@ -87,18 +89,22 @@ for _, strategy in helpers.each_strategy() do
     end)
   
     describe("Checking access_token", function()
-      -- it("should result in access denied because no token was attached to header", function()
-      --   local res = assert(proxy_client:send {
-      --     method = "GET",
-      --     path   = "/healthcheck",
-      --     headers = {
-      --       ["Host"] = "oidc-mock.com"
-      --     }
-      --   })
-      --   local body = assert.res_status(401, res)
-      -- end)
+      it("should result in access denied because no token was attached to header", function()
+        local res = assert(proxy_client:send {
+          method = "GET",
+          path   = "/healthcheck",
+          headers = {
+            ["Host"] = "oidc-mock.com"
+          }
+        })
+        local body = assert.res_status(401, res)
+      end)
 
       it("should result in access", function()
+        local httpc = http.new()
+
+        local res, err = httpc:request_uri(oidc_mock_endpoint .. "/generate-token", { method = "POST" })
+        
         -- local res = assert(proxy_client:send {
         --   method = "POST",
         --   path = "/generate-token",
@@ -115,7 +121,7 @@ for _, strategy in helpers.each_strategy() do
           path   = "/healthcheck",
           headers = {
             ["Host"] = "oidc-mock.com",
-            ["Authorization"] = "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IlJTRmJ6TVRJaXM3V0JyTEVJUXRZTFNqTmJJLUNWUHJpYUdPNU1rV1JDX1UifQ.eyJpc3MiOiJodHRwOi8vb2lkYy1tb2NrOjgwODAiLCJpYXQiOjE2MTEzMjY5NjgsImV4cCI6MTYxMTMzMDU2OCwibmJmIjoxNjExMzI2OTU4LCJzdWIiOiJKb2huIERvZSIsImFtciI6WyJwd2QiXX0.4uRzIxjantG9yqtrdXL6UlzIMdEZsJv8Se-YXk0gldIcPFFi9GsZTpm-oUXxCtrMGTC_dJI0K6AX7c0E8ZvDX09_ytapv5yEpnmq2cILEADnDtrnMAVi4yG1nFSTLamkgfvNu-nrAeLWwd1I_gaqrOF-yLRaCZPx-0-0VSduYbEjr-sLps6B_FXt7Z5MoAyFTJaF3XTIpj8srXLe4TSWACHzardAEBVR43KidBO13arErcSXwBjhdm_D9QwT-dY_NRMe5Dlu18hBkquNiGCCqerHe1TAVtAyVTalEl3jUWUN_JeMxqrF1wcuVe5AOdqPdDs64pTL7WdAWHvP42PwFQ"
+            ["Authorization"] = "Bearer " .. res.body
           }
         })
         local body = assert.res_status(200, res)
