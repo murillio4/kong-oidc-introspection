@@ -47,3 +47,6 @@ servroot
 /lua
 /lua_modules
 /.luarocks
+
+.vscode/
+lua5.1/

@@ -25,6 +25,7 @@ app.post("/generate-token", (req, res) => {
         Object.assign(payload, {
           sub: "John Doe",
           amr: ['pwd'],
+          aud: req.body.aud ?? "no-aud",
           scope: req.body.scope,
         });
     }

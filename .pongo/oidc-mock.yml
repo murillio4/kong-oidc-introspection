@@ -5,8 +5,6 @@ services:
     image: oidc-mock
     build:
       context: ${PWD}/.pongo/oidc-mock
-    ports:
-      - "8080:8080"
     healthcheck:
       interval: 10s
       retries: 10

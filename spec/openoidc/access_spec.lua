@@ -1,38 +1,42 @@
 local utils = require "kong.tools.utils"
 local helpers = require "spec.helpers"
-local http = require "resty.http"
 
+
+local httpc = require("resty.http").new()
 local oidc_mock_endpoint = "http://oidc-mock:8080"
 
--- local function get_token(claims, ttl)
---   local req = request.new_from_uri("http://oidc-mock:8080")
---   req.headers:upsert(":method", "POST")
+local function get_token(options)
+  options = options or {}
+  local body = {}
 
---   if claims or ttl then
---     -- req.headers:append("content-type", "application/x-www-form-urlencoded");
---     local body = nil;
+  if options.claims then
+    table.insert(body, "claims=" .. options.claims)
+  end
+  if options.ttl then 
+    table.insert(body, "ttl=" .. options.ttl)
+  end
+  if options.aud then
+    table.insert(body, "aud=" .. options.aud)
+  end
 
---     if claims then
---       body = "claims=" .. claims;
---     end
+  local res, err = httpc:request_uri(oidc_mock_endpoint .. "/generate-token", { 
+    method = "POST",
+    headers = {
+      ["Content-Type"] = "application/x-www-form-urlencoded",
+    },
+    body = table.concat(body, "&")
+ })
 
---     if ttl then
---       if body then
---         body = body .. "&"
---       end
+ if err then
+  return nil, err
+ end
 
---       body = body .. "ttl=" .. ttl
---     end
---   end
+ return res.body
+end
 
---   local headers, stream = req:go(600)
---   return stream:get_body_as_string()
--- end
-
-for _, strategy in helpers.each_strategy() do
-  describe("openidc plugin", function()
+for _, strategy in helpers.all_strategies() do
+  describe("Plugin: oidc auth [#" .. strategy .. "]", function()
     local proxy_client
-    local admin_client
   
     lazy_setup(function()
       local bp = helpers.get_db_utils(strategy, {
@@ -48,12 +52,12 @@ for _, strategy in helpers.each_strategy() do
       })
 
       local route1 = bp.routes:insert {
-        hosts = { "oidc-mock.com" },
+        hosts = { "auth1.com" },
         service    = service
       }
 
       local route2 = bp.routes:insert {
-        hosts = { "token.com" },
+        hosts = { "auth2.com" },
         service    = service
       }
 
@@ -62,29 +66,33 @@ for _, strategy in helpers.each_strategy() do
         route    = { id = route1.id },
         config = {
           ssl_verify = "no",
-          -- discovery = "https://pepperitlab.b2clogin.com/pepperitlab.onmicrosoft.com/B2C_1_SignIn/.well-known/openid-configuration"
           discovery = "http://oidc-mock:8080/.well-known/openid-configuration"
+        },
+      }
+
+      bp.plugins:insert {
+        name     = "openidc",
+        route    = { id = route2.id },
+        config = {
+          ssl_verify = "no",
+          discovery = "http://oidc-mock:8080/.well-known/openid-configuration",
+          audience = "test"
         },
       }
   
       assert(helpers.start_kong({
-        database   = strategy,
+        database = strategy,
         plugins = "openidc",
       }))
-      print("Kong started")
-    end)
-  
-    before_each(function()
-      proxy_client = helpers.proxy_client()
-      admin_client = helpers.admin_client()
-    end)
 
-    after_each(function ()
-      proxy_client:close()
-      admin_client:close()
+      proxy_client = helpers.proxy_client()
     end)
 
     lazy_teardown(function()
+      if proxy_client then
+        proxy_client:close()
+      end
+
       helpers.stop_kong()
     end)
   
@@ -94,34 +102,66 @@ for _, strategy in helpers.each_strategy() do
           method = "GET",
           path   = "/healthcheck",
           headers = {
-            ["Host"] = "oidc-mock.com"
+            ["Host"] = "auth1.com"
           }
         })
         local body = assert.res_status(401, res)
       end)
 
       it("should result in access", function()
-        local httpc = http.new()
+        local token, err = get_token()
+        local res = assert(proxy_client:send {
+          method = "GET",
+          path   = "/healthcheck",
+          headers = {
+            ["Host"] = "auth1.com",
+            ["Authorization"] = "Bearer " .. token
+          }
+        })
+        local body = assert.res_status(200, res)
+      end)
+    end)
 
-        local res, err = httpc:request_uri(oidc_mock_endpoint .. "/generate-token", { method = "POST" })
-        
-        -- local res = assert(proxy_client:send {
-        --   method = "POST",
-        --   path = "/generate-token",
-        --   headers = {
-        --     ["Host"] = "token.com"
-        --   }
-        -- })
+    describe("Checking access_token with aud", function()
+      it("should result in access denied because no audience", function()
+        local token, err = get_token()
+        local res = assert(proxy_client:send {
+          method = "GET",
+          path   = "/healthcheck",
+          headers = {
+            ["Host"] = "auth2.com",
+            ["Authorization"] = "Bearer " .. token
+          }
+        })
+        local body = assert.res_status(403, res)
+      end)
 
-        -- print(res)
-        -- local token = res.body;
+      it("should result in access denied because wrong audience", function()
+        local token, err = get_token({
+          aud = "asd"
+        })
 
         local res = assert(proxy_client:send {
           method = "GET",
           path   = "/healthcheck",
           headers = {
-            ["Host"] = "oidc-mock.com",
-            ["Authorization"] = "Bearer " .. res.body
+            ["Host"] = "auth2.com",
+            ["Authorization"] = "Bearer " .. token
+          }
+        })
+        local body = assert.res_status(403, res)
+      end)
+
+      it("should result in access", function()
+        local token, err = get_token({
+          aud = "test"
+        })
+        local res = assert(proxy_client:send {
+          method = "GET",
+          path   = "/healthcheck",
+          headers = {
+            ["Host"] = "auth2.com",
+            ["Authorization"] = "Bearer " .. token
           }
         })
         local body = assert.res_status(200, res)

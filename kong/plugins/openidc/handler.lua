@@ -12,7 +12,7 @@ local WARN = ngx.WARN
 local OpenidcHandler = BasePlugin:extend()
 
 OpenidcHandler.PRIORITY = 1001
-OpenidcHandler.VERSION = "0.1.0"
+OpenidcHandler.VERSION = "0.1.1"
 
 function OpenidcHandler:new()
   OpenidcHandler.super.new(self, "kong-openidc")
